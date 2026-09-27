@@ -3,6 +3,6 @@
   "Built-in Git extension not found.": "Extensao Git interna nao encontrada.",
   "Built-in Git extension is disabled.": "A extensao Git interna esta desabilitada.",
   "No Git repository found for the active file.": "Nenhum repositorio Git encontrado para o arquivo ativo.",
-  "Could not find the VS Code SCM command for repository {0}.": "Comando SCM do VS Code nao encontrado para o repositorio {0}.",
+  "Could not select Git repository {0} in the Source Control view.": "Nao foi possivel selecionar o repositorio Git {0} na exibicao Controle do Codigo-Fonte.",
   "Selected Git repository: {0}": "Repositorio Git selecionado: {0}"
 }

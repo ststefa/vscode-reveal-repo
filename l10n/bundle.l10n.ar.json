@@ -3,6 +3,6 @@
   "Built-in Git extension not found.": "لم يتم العثور على إضافة Git المدمجة.",
   "Built-in Git extension is disabled.": "إضافة Git المدمجة معطلة.",
   "No Git repository found for the active file.": "لم يتم العثور على مستودع Git للملف النشط.",
-  "Could not find the VS Code SCM command for repository {0}.": "تعذر العثور على أمر VS Code SCM للمستودع {0}.",
+  "Could not select Git repository {0} in the Source Control view.": "تعذر تحديد مستودع Git {0} في عرض التحكم بالمصدر.",
   "Selected Git repository: {0}": "مستودع Git المحدد: {0}"
 }

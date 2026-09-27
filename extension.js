@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const noRepositoryStatusBarTimeoutMs = 3000;
 const repositoryStatusBarTimeoutMs = 3000;
-const repositoryCommandErrorTimeoutMs = 5000;
+const repositorySelectionErrorTimeoutMs = 5000;
 const repositorySelectionSettleTimeoutMs = 50;
 const outputChannelName = 'Reveal Repo';
 
@@ -13,6 +13,8 @@ let outputChannel;
 let runCounter = 0;
 
 /**
+ * Registers the command and creates the diagnostic output channel.
+ *
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
@@ -26,6 +28,9 @@ function activate(context) {
   );
 }
 
+/**
+ * Selects the Git repository that owns the active editor file.
+ */
 async function selectActiveRepository() {
   const runId = nextRunId();
   const editor = vscode.window.activeTextEditor;
@@ -95,10 +100,10 @@ async function selectActiveRepository() {
     logRun(runId, `result=selectionFailed; target=${repositoryDebugName(target)}`);
     vscode.window.setStatusBarMessage(
       vscode.l10n.t(
-        'Could not find the VS Code SCM command for repository {0}.',
+        'Could not select Git repository {0} in the Source Control view.',
         repositoryName(target)
       ),
-      repositoryCommandErrorTimeoutMs
+      repositorySelectionErrorTimeoutMs
     );
     return;
   }
@@ -110,15 +115,26 @@ async function selectActiveRepository() {
   );
 }
 
+/**
+ * Opens Source Control and focuses its repositories list.
+ */
 async function focusRepositoriesView() {
+  // These command IDs are VS Code workbench commands, not part of the Git
+  // extension API. They are much less volatile than the private scm<N> commands
+  // we tried earlier, but a VS Code update could still change their behavior.
+  // The generic list commands below act on whichever VS Code list currently has
+  // focus, so make the Source Control repositories list the active list first.
   await vscode.commands.executeCommand('workbench.view.scm');
   await vscode.commands.executeCommand('workbench.scm.repositories.focus');
 }
 
 /**
+ * Selects the target repository by navigating the visible repositories list.
+ *
  * @param {number} runId
  * @param {GitRepository[]} repositories
  * @param {GitRepository} target
+ * @returns {Promise<boolean>} Whether the target repository could be selected.
  */
 async function selectTargetRepository(runId, repositories, target) {
   await focusRepositoriesView();
@@ -140,6 +156,9 @@ async function selectTargetRepository(runId, repositories, target) {
     return false;
   }
 
+  // The list.* commands are generic workbench commands rather than Git API.
+  // Navigating the visible list uses the same ordering the user sees, which has
+  // proven more stable than VS Code's private scm<N> repository commands.
   logRun(runId, 'listNavigation=focusFirst');
   await vscode.commands.executeCommand('list.focusFirst');
 
@@ -155,33 +174,52 @@ async function selectTargetRepository(runId, repositories, target) {
   return true;
 }
 
+/**
+ * Gives VS Code a short moment to reflect list selection into Git API state.
+ */
 async function waitForRepositorySelectionToSettle() {
+  // VS Code command execution can resolve before SCM selection state is reflected
+  // back through the Git API. The short delay makes diagnostic logging less racy.
   await new Promise(resolve =>
     setTimeout(resolve, repositorySelectionSettleTimeoutMs)
   );
 }
 
 /**
+ * Returns the display name VS Code uses for a repository root.
+ *
  * @param {GitRepository} repository
+ * @returns {string}
  */
 function repositoryName(repository) {
   return path.basename(repository.rootUri.fsPath);
 }
 
 /**
+ * Formats one repository for diagnostic output.
+ *
  * @param {GitRepository} repository
+ * @returns {string}
  */
 function repositoryDebugName(repository) {
   return `${repositoryName(repository)}<${repository.rootUri.fsPath}>`;
 }
 
 /**
+ * Formats a repository list for diagnostic output.
+ *
  * @param {GitRepository[]} repositories
+ * @returns {string}
  */
 function repositoryNames(repositories) {
   return repositories.map(repositoryDebugName).join(',');
 }
 
+/**
+ * Formats workspace folders for diagnostic output.
+ *
+ * @returns {string}
+ */
 function workspaceFolderNames() {
   return (vscode.workspace.workspaceFolders || [])
     .map(folder => `${folder.name}<${folder.uri.fsPath}>`)
@@ -189,10 +227,16 @@ function workspaceFolderNames() {
 }
 
 /**
+ * Sorts repositories to match the Source Control repositories view.
+ *
  * @param {number} runId
  * @param {GitRepository[]} repositories
+ * @returns {GitRepository[]}
  */
 function sortRepositoriesForView(runId, repositories) {
+  // The Repositories view can be sorted by setting. Mirror that ordering before
+  // calculating how many list.focusDown commands are needed to reach the target.
+  /** @type {string} */
   const sortKey = vscode.workspace
     .getConfiguration('scm')
     .get('repositories.sortKey', 'name');
@@ -211,16 +255,22 @@ function sortRepositoriesForView(runId, repositories) {
 }
 
 /**
+ * Logs the repositories that the Git API currently reports as selected.
+ *
  * @param {number} runId
  * @param {GitRepository[]} repositories
  * @param {string} label
  */
 function logSelectedRepositories(runId, repositories, label) {
+  // This log is diagnostic only; it lets issue reports show whether VS Code's
+  // Git API observed the same selection the user saw in the Source Control view.
   const selectedRepositories = repositories.filter(repository => repository.ui.selected);
   logRun(runId, `${label}=${repositoryNames(selectedRepositories) || '<none>'}`);
 }
 
 /**
+ * Writes one timestamped line to the extension output channel.
+ *
  * @param {string} message
  */
 function logDebug(message) {
@@ -228,6 +278,8 @@ function logDebug(message) {
 }
 
 /**
+ * Writes one timestamped line scoped to a command run.
+ *
  * @param {number} runId
  * @param {string} message
  */
@@ -236,6 +288,8 @@ function logRun(runId, message) {
 }
 
 /**
+ * Logs VS Code environment details useful for issue reports.
+ *
  * @param {number} runId
  */
 function logEnvironment(runId) {
@@ -251,6 +305,11 @@ function logEnvironment(runId) {
   );
 }
 
+/**
+ * Starts a new diagnostic run and returns its numeric id.
+ *
+ * @returns {number}
+ */
 function nextRunId() {
   runCounter += 1;
   logDebug(`--- Reveal Repo run #${runCounter} ---`);
@@ -258,7 +317,10 @@ function nextRunId() {
 }
 
 /**
+ * Converts VS Code's UIKind enum into stable diagnostic text.
+ *
  * @param {vscode.UIKind} uiKind
+ * @returns {string}
  */
 function uiKindName(uiKind) {
   if (uiKind === vscode.UIKind.Web) {
@@ -272,6 +334,11 @@ function uiKindName(uiKind) {
   return String(uiKind);
 }
 
+/**
+ * Returns the diagnostic output channel, creating it lazily for tests.
+ *
+ * @returns {vscode.OutputChannel}
+ */
 function getOutputChannel() {
   if (!outputChannel) {
     outputChannel = vscode.window.createOutputChannel(outputChannelName);
@@ -281,36 +348,51 @@ function getOutputChannel() {
 }
 
 /**
+ * Compares repositories by canonical root URI.
+ *
  * @param {GitRepository} a
  * @param {GitRepository} b
+ * @returns {boolean}
  */
 function sameRepository(a, b) {
   return repositoryKey(a) === repositoryKey(b);
 }
 
 /**
+ * Sort comparison matching VS Code's repository name ordering.
+ *
  * @param {GitRepository} a
  * @param {GitRepository} b
+ * @returns {number}
  */
 function compareRepositoriesByName(a, b) {
   return repositoryName(a).localeCompare(repositoryName(b));
 }
 
 /**
+ * Sort comparison matching VS Code's repository path ordering.
+ *
  * @param {GitRepository} a
  * @param {GitRepository} b
+ * @returns {number}
  */
 function compareRepositoriesByPath(a, b) {
   return a.rootUri.fsPath.localeCompare(b.rootUri.fsPath);
 }
 
 /**
+ * Returns the stable identity used to compare Git API repository wrappers.
+ *
  * @param {GitRepository} repository
+ * @returns {string}
  */
 function repositoryKey(repository) {
   return repository.rootUri.toString();
 }
 
+/**
+ * VS Code deactivate hook; no resources need explicit cleanup.
+ */
 function deactivate() {
   // Nothing to clean up.
 }
@@ -318,7 +400,7 @@ function deactivate() {
 module.exports = {
   activate,
   deactivate,
-  _test: {
+  _internal: {
     selectActiveRepository,
   },
 };

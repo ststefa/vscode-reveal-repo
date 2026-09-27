@@ -3,6 +3,6 @@
   "Built-in Git extension not found.": "Built-in Git extension not found.",
   "Built-in Git extension is disabled.": "Built-in Git extension is disabled.",
   "No Git repository found for the active file.": "No Git repository found for the active file.",
-  "Could not find the VS Code SCM command for repository {0}.": "Could not find the VS Code SCM command for repository {0}.",
+  "Could not select Git repository {0} in the Source Control view.": "Could not select Git repository {0} in the Source Control view.",
   "Selected Git repository: {0}": "Selected Git repository: {0}"
 }

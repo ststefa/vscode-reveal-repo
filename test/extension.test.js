@@ -11,7 +11,7 @@ test.after(() => {
 test('shows an information message when no editor is active', async () => {
   const fixture = loadExtensionWithFixture({ activeEditorRepository: undefined });
 
-  await fixture.extension._test.selectActiveRepository();
+  await fixture.extension._internal.selectActiveRepository();
 
   assert.deepEqual(fixture.messages.info, ['No active editor.']);
   assert.deepEqual(fixture.executedCommands, []);
@@ -24,7 +24,7 @@ test('shows a status bar message when the active file has no Git repository', as
     activeEditorRepository: null,
   });
 
-  await fixture.extension._test.selectActiveRepository();
+  await fixture.extension._internal.selectActiveRepository();
 
   assert.deepEqual(fixture.messages.info, []);
   assert.deepEqual(fixture.messages.statusBar, [
@@ -46,7 +46,7 @@ test('selects the target repository by navigating the repositories list by name'
     activeEditorRepository: repoB,
   });
 
-  await fixture.extension._test.selectActiveRepository();
+  await fixture.extension._internal.selectActiveRepository();
 
   assert.equal(repoA.ui.selected, false);
   assert.equal(repoB.ui.selected, true);
@@ -78,7 +78,7 @@ test('moves down to the target repository in sorted repository name order', asyn
     activeEditorRepository: repoB,
   });
 
-  await fixture.extension._test.selectActiveRepository();
+  await fixture.extension._internal.selectActiveRepository();
 
   assert.deepEqual(fixture.executedCommands, [
     'workbench.view.scm',
@@ -104,7 +104,7 @@ test('uses repository path order when the SCM repository sort key is path', asyn
     repositorySortKey: 'path',
   });
 
-  await fixture.extension._test.selectActiveRepository();
+  await fixture.extension._internal.selectActiveRepository();
 
   assert.equal(repoA.ui.selected, false);
   assert.equal(repoB.ui.selected, true);
@@ -124,12 +124,11 @@ test('uses discovery order when the SCM repository sort key is discoveryTime', a
   const repoC = createRepository('/workspace/build-lab', false);
   const fixture = loadExtensionWithFixture({
     repositories: [repoA, repoB, repoC],
-    repositoriesAfterGetRepository: [repoB, repoA, repoC],
     activeEditorRepository: repoB,
     repositorySortKey: 'discoveryTime',
   });
 
-  await fixture.extension._test.selectActiveRepository();
+  await fixture.extension._internal.selectActiveRepository();
 
   assert.equal(repoA.ui.selected, false);
   assert.equal(repoB.ui.selected, true);
@@ -154,7 +153,7 @@ test('does not toggle the target repository when it is already selected', async 
     activeEditorRepository: target,
   });
 
-  await fixture.extension._test.selectActiveRepository();
+  await fixture.extension._internal.selectActiveRepository();
 
   assert.deepEqual(fixture.executedCommands, [
     'workbench.view.scm',
@@ -164,7 +163,6 @@ test('does not toggle the target repository when it is already selected', async 
 
 function loadExtensionWithFixture(options) {
   const repositories = options.repositories || [];
-  let repositoryReads = 0;
   const activeEditorUri = createUri('/workspace/meta/file.txt');
   const messages = {
     errors: [],
@@ -175,15 +173,7 @@ function loadExtensionWithFixture(options) {
   const executedCommands = [];
   let focusedRepositoryIndex = -1;
   const gitApi = {
-    get repositories() {
-      repositoryReads += 1;
-
-      if (repositoryReads > 1 && options.repositoriesAfterGetRepository) {
-        return options.repositoriesAfterGetRepository;
-      }
-
-      return repositories;
-    },
+    repositories,
     getRepository(uri) {
       assert.equal(uri, activeEditorUri);
       return options.activeEditorRepository;
@@ -257,9 +247,6 @@ function loadExtensionWithFixture(options) {
       },
     },
     commands: {
-      async getCommands() {
-        return [];
-      },
       async executeCommand(command) {
         executedCommands.push(command);
 
