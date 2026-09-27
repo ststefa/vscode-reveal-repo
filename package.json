@@ -27,12 +27,12 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/ststefa/reveal-repo.git"
+        "url": "https://github.com/ststefa/vscode-reveal-repo.git"
     },
     "bugs": {
-        "url": "https://github.com/ststefa/reveal-repo/issues"
+        "url": "https://github.com/ststefa/vscode-reveal-repo/issues"
     },
-    "homepage": "https://github.com/ststefa/reveal-repo#readme",
+    "homepage": "https://github.com/ststefa/vscode-reveal-repo#readme",
     "license": "CC-BY-SA-4.0",
     "devDependencies": {
         "@vscode/vsce": "^3.6.0"
