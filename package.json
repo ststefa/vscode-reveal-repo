@@ -3,7 +3,7 @@
     "displayName": "Reveal Repo",
     "author": "Stefan Steinert <ststefa@heldenzeit.net>",
     "publisher": "StefanSteinert",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Reveal the Git repository for the active file in VS Code's Source Control view",
     "icon": "images/icon.png",
     "engines": {
@@ -35,7 +35,7 @@
     "homepage": "https://github.com/ststefa/vscode-reveal-repo#readme",
     "license": "CC-BY-SA-4.0",
     "devDependencies": {
-        "@vscode/vsce": "^3.6.0"
+        "@vscode/vsce": "^4.0.0"
     },
     "scripts": {
         "package": "vsce package",

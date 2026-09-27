@@ -94,14 +94,14 @@ test('moves down to the target repository in sorted repository name order', asyn
   );
 });
 
-test('uses repository path order when the SCM repository sort key is path', async () => {
+test('uses repository path order when the SCM repository sort order is path', async () => {
   const repoA = createRepository('/workspace/repo-a', false);
   const repoB = createRepository('/workspace/meta', false);
   const repoC = createRepository('/workspace/aaa/repo-c', false);
   const fixture = loadExtensionWithFixture({
     repositories: [repoA, repoB, repoC],
     activeEditorRepository: repoB,
-    repositorySortKey: 'path',
+    repositorySortOrder: 'path',
   });
 
   await fixture.extension._internal.selectActiveRepository();
@@ -118,14 +118,107 @@ test('uses repository path order when the SCM repository sort key is path', asyn
   ]);
 });
 
-test('uses discovery order when the SCM repository sort key is discoveryTime', async () => {
+test('ignores nested repositories that are not shown in the repositories view', async () => {
+  const docker = createRepository('/workspace/docker', false);
+  const nestedDocker = createRepository(
+    '/workspace/docker/.gitlab-ci-local/builds/.docker',
+    false
+  );
+  const privateRepo = createRepository('/workspace/private_repo', false);
+  const puppetClient = createRepository('/workspace/puppet_client', false);
+  const fixture = loadExtensionWithFixture({
+    repositories: [docker, nestedDocker, privateRepo, puppetClient],
+    activeEditorRepository: privateRepo,
+    repositorySortOrder: 'path',
+    visibleRepositories: [docker, privateRepo, puppetClient],
+  });
+
+  await fixture.extension._internal.selectActiveRepository();
+
+  assert.equal(docker.ui.selected, false);
+  assert.equal(nestedDocker.ui.selected, false);
+  assert.equal(privateRepo.ui.selected, true);
+  assert.equal(puppetClient.ui.selected, false);
+  assert.deepEqual(fixture.executedCommands, [
+    'workbench.view.scm',
+    'workbench.scm.repositories.focus',
+    'list.focusFirst',
+    'list.focusDown',
+    'list.select',
+  ]);
+  assert.match(
+    fixture.messages.output.join('\n'),
+    /repositoriesHiddenAsNested=.*\.docker/
+  );
+});
+
+test('corrects selection when list focus starts before the first repository row', async () => {
   const repoA = createRepository('/workspace/bass-cli', false);
   const repoB = createRepository('/workspace/meta', false);
   const repoC = createRepository('/workspace/build-lab', false);
   const fixture = loadExtensionWithFixture({
     repositories: [repoA, repoB, repoC],
     activeEditorRepository: repoB,
-    repositorySortKey: 'discoveryTime',
+    focusFirstRepositoryIndex: -1,
+  });
+
+  await fixture.extension._internal.selectActiveRepository();
+
+  assert.equal(repoA.ui.selected, false);
+  assert.equal(repoB.ui.selected, true);
+  assert.equal(repoC.ui.selected, false);
+  assert.deepEqual(fixture.executedCommands, [
+    'workbench.view.scm',
+    'workbench.scm.repositories.focus',
+    'list.focusFirst',
+    'list.focusDown',
+    'list.focusDown',
+    'list.select',
+    'list.focusDown',
+    'list.select',
+  ]);
+  assert.match(
+    fixture.messages.output.join('\n'),
+    /selectionCorrection=selectedIndex:1; targetIndex:2/
+  );
+});
+
+test('corrects selection when the first select does not hit a repository row', async () => {
+  const repoA = createRepository('/workspace/private_repo', false);
+  const repoB = createRepository('/workspace/puppet_client', false);
+  const fixture = loadExtensionWithFixture({
+    repositories: [repoA, repoB],
+    activeEditorRepository: repoA,
+    focusFirstRepositoryIndex: -1,
+    repositorySortOrder: 'path',
+  });
+
+  await fixture.extension._internal.selectActiveRepository();
+
+  assert.equal(repoA.ui.selected, true);
+  assert.equal(repoB.ui.selected, false);
+  assert.deepEqual(fixture.executedCommands, [
+    'workbench.view.scm',
+    'workbench.scm.repositories.focus',
+    'list.focusFirst',
+    'list.select',
+    'list.focusDown',
+    'list.select',
+  ]);
+  assert.match(
+    fixture.messages.output.join('\n'),
+    /selectionCorrection=selectedIndex:-1; targetIndex:0/
+  );
+});
+
+test('uses discovery order when the SCM repository sort order is discovery time', async () => {
+  const repoA = createRepository('/workspace/bass-cli', false);
+  const repoB = createRepository('/workspace/meta', false);
+  const repoC = createRepository('/workspace/build-lab', false);
+  const fixture = loadExtensionWithFixture({
+    repositories: [repoA, repoB, repoC],
+    activeEditorRepository: repoB,
+    repositorySortOrder: 'discovery time',
   });
 
   await fixture.extension._internal.selectActiveRepository();
@@ -146,6 +239,107 @@ test('uses discovery order when the SCM repository sort key is discoveryTime', a
   );
 });
 
+test('corrects when the visible repositories list uses a different sort order', async () => {
+  const privateRepo = createRepository('/workspace/private_repo', false);
+  const puppetClient = createRepository('/workspace/puppet_client', false);
+  const pihole = createRepository('/workspace/pihole', false);
+  const fixture = loadExtensionWithFixture({
+    repositories: [privateRepo, puppetClient, pihole],
+    activeEditorRepository: privateRepo,
+    repositorySortOrder: 'path',
+    actualViewSortOrder: 'discovery time',
+  });
+
+  await fixture.extension._internal.selectActiveRepository();
+
+  assert.equal(privateRepo.ui.selected, true);
+  assert.equal(puppetClient.ui.selected, false);
+  assert.equal(pihole.ui.selected, false);
+  assert.deepEqual(fixture.executedCommands, [
+    'workbench.view.scm',
+    'workbench.scm.repositories.focus',
+    'list.focusFirst',
+    'list.focusDown',
+    'list.select',
+    'list.focusUp',
+    'list.select',
+  ]);
+  assert.match(
+    fixture.messages.output.join('\n'),
+    /repositoryOrderAttempt=path/
+  );
+});
+
+test('tries another repository order when correction cannot recover', async () => {
+  const privateRepo = createRepository('/workspace/private_repo', false);
+  const puppetClient = createRepository('/workspace/puppet_client', false);
+  const pihole = createRepository('/workspace/pihole', false);
+  const fixture = loadExtensionWithFixture({
+    repositories: [privateRepo, puppetClient, pihole],
+    activeEditorRepository: pihole,
+    repositorySortOrder: 'path',
+    actualViewSortOrder: 'discovery time',
+  });
+
+  await fixture.extension._internal.selectActiveRepository();
+
+  assert.equal(privateRepo.ui.selected, false);
+  assert.equal(puppetClient.ui.selected, false);
+  assert.equal(pihole.ui.selected, true);
+  assert.deepEqual(fixture.executedCommands, [
+    'workbench.view.scm',
+    'workbench.scm.repositories.focus',
+    'list.focusFirst',
+    'list.select',
+    'list.focusUp',
+    'list.select',
+    'list.focusFirst',
+    'list.focusDown',
+    'list.focusDown',
+    'list.select',
+  ]);
+  assert.match(
+    fixture.messages.output.join('\n'),
+    /repositoryOrderAttempt=path/
+  );
+  assert.match(
+    fixture.messages.output.join('\n'),
+    /repositoryOrderAttempt=discovery time/
+  );
+});
+
+test('navigates relative to the currently selected repository when there is one', async () => {
+  const argoCd = createRepository('/workspace/platform/delivery/argo-cd', false);
+  const arn = createRepository('/workspace/platform/delivery/arn', false);
+  const gitops = createRepository('/workspace/platform/delivery/gitops', false);
+  const pypromote = createRepository('/workspace/platform/delivery/pypromote', true);
+  const fixture = loadExtensionWithFixture({
+    repositories: [argoCd, arn, gitops, pypromote],
+    activeEditorRepository: argoCd,
+    repositorySortOrder: 'path',
+    initialFocusedRepositoryIndex: 3,
+  });
+
+  await fixture.extension._internal.selectActiveRepository();
+
+  assert.equal(argoCd.ui.selected, true);
+  assert.equal(arn.ui.selected, false);
+  assert.equal(gitops.ui.selected, false);
+  assert.equal(pypromote.ui.selected, false);
+  assert.deepEqual(fixture.executedCommands, [
+    'workbench.view.scm',
+    'workbench.scm.repositories.focus',
+    'list.focusUp',
+    'list.focusUp',
+    'list.focusUp',
+    'list.select',
+  ]);
+  assert.match(
+    fixture.messages.output.join('\n'),
+    /listNavigation=fromSelectedRepository; selectedIndex:3; targetIndex:0/
+  );
+});
+
 test('does not toggle the target repository when it is already selected', async () => {
   const target = createRepository('/workspace/meta', true);
   const fixture = loadExtensionWithFixture({
@@ -163,6 +357,7 @@ test('does not toggle the target repository when it is already selected', async 
 
 function loadExtensionWithFixture(options) {
   const repositories = options.repositories || [];
+  const visibleRepositories = options.visibleRepositories || repositories;
   const activeEditorUri = createUri('/workspace/meta/file.txt');
   const messages = {
     errors: [],
@@ -171,7 +366,7 @@ function loadExtensionWithFixture(options) {
     statusBar: [],
   };
   const executedCommands = [];
-  let focusedRepositoryIndex = -1;
+  let focusedRepositoryIndex = options.initialFocusedRepositoryIndex ?? -1;
   const gitApi = {
     repositories,
     getRepository(uri) {
@@ -224,8 +419,8 @@ function loadExtensionWithFixture(options) {
         assert.equal(section, 'scm');
         return {
           get(key, defaultValue) {
-            assert.equal(key, 'repositories.sortKey');
-            return options.repositorySortKey || defaultValue;
+            assert.equal(key, 'repositories.sortOrder');
+            return options.repositorySortOrder || defaultValue;
           },
         };
       },
@@ -247,11 +442,16 @@ function loadExtensionWithFixture(options) {
       },
     },
     commands: {
-      async executeCommand(command) {
-        executedCommands.push(command);
+      async executeCommand(command, args) {
+        executedCommands.push(args === undefined ? command : [command, args]);
 
         if (command === 'list.focusFirst') {
-          focusedRepositoryIndex = 0;
+          focusedRepositoryIndex = options.focusFirstRepositoryIndex || 0;
+          return;
+        }
+
+        if (command === 'list.focusUp') {
+          focusedRepositoryIndex -= 1;
           return;
         }
 
@@ -262,8 +462,8 @@ function loadExtensionWithFixture(options) {
 
         if (command === 'list.select') {
           const repositoriesInViewOrder = sortRepositoriesForFixture(
-            repositories,
-            options.repositorySortKey || 'name'
+            visibleRepositories,
+            options.actualViewSortOrder || options.repositorySortOrder || 'name'
           );
           const repository = repositoriesInViewOrder[focusedRepositoryIndex];
 
@@ -294,14 +494,14 @@ function loadExtensionWithFixture(options) {
   };
 }
 
-function sortRepositoriesForFixture(repositories, sortKey) {
-  if (sortKey === 'path') {
+function sortRepositoriesForFixture(repositories, sortOrder) {
+  if (sortOrder === 'path') {
     return [...repositories].sort((a, b) =>
       a.rootUri.fsPath.localeCompare(b.rootUri.fsPath)
     );
   }
 
-  if (sortKey === 'discoveryTime') {
+  if (sortOrder === 'discovery time') {
     return repositories;
   }
 

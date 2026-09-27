@@ -129,7 +129,7 @@ async function focusRepositoriesView() {
 }
 
 /**
- * Selects the target repository by navigating the visible repositories list.
+ * Selects the target repository through the focused repositories list.
  *
  * @param {number} runId
  * @param {GitRepository[]} repositories
@@ -139,21 +139,71 @@ async function focusRepositoriesView() {
 async function selectTargetRepository(runId, repositories, target) {
   await focusRepositoriesView();
 
-  if (target.ui.selected) {
-    logRun(runId, 'targetUiSelected=true; no list navigation executed');
-    return true;
+  const visibleRepositories = repositoriesVisibleInScmView(runId, repositories, target);
+  const repositoryOrders = repositoryOrdersForView(runId, visibleRepositories);
+
+  for (const order of repositoryOrders) {
+    if (await selectTargetRepositoryInOrder(runId, repositories, target, order)) {
+      return true;
+    }
   }
 
-  const repositoriesInViewOrder = sortRepositoriesForView(runId, repositories);
-  const repositoryIndex = repositoriesInViewOrder.findIndex(repository =>
+  return false;
+}
+
+/**
+ * Tries to select the target while assuming one concrete repositories view order.
+ *
+ * @param {number} runId
+ * @param {GitRepository[]} repositories
+ * @param {GitRepository} target
+ * @param {RepositoryOrder} order
+ * @returns {Promise<boolean>} Whether this order selected the target.
+ */
+async function selectTargetRepositoryInOrder(runId, repositories, target, order) {
+  const repositoryIndex = order.repositories.findIndex(repository =>
     sameRepository(repository, target)
   );
 
-  logRun(runId, `repositoriesInViewOrder=${repositoryNames(repositoriesInViewOrder)}`);
+  logRun(runId, `repositoryOrderAttempt=${order.label}`);
+  logRun(runId, `repositoriesInViewOrder=${repositoryNames(order.repositories)}`);
   logRun(runId, `viewRepositoryIndex=${repositoryIndex}`);
 
   if (repositoryIndex === -1) {
     return false;
+  }
+
+  const selectedRepositories = selectedRepositoriesFrom(repositories);
+  const selectedRepository = selectedRepositories.length === 1
+    ? selectedRepositories[0]
+    : undefined;
+
+  if (selectedRepository && sameRepository(selectedRepository, target)) {
+    logRun(runId, 'targetUiSelected=true; no list navigation executed');
+    return true;
+  }
+
+  if (selectedRepositories.length > 1) {
+    logRun(runId, `selectedRepositoriesBeforeNavigation=${repositoryNames(selectedRepositories)}`);
+  }
+
+  if (selectedRepository) {
+    const selectedIndex = order.repositories.findIndex(repository =>
+      sameRepository(repository, selectedRepository)
+    );
+
+    logRun(
+      runId,
+      `listNavigation=fromSelectedRepository; selectedIndex:${selectedIndex}; targetIndex:${repositoryIndex}`
+    );
+
+    if (selectedIndex !== -1) {
+      await moveRepositoryListFocus(runId, repositoryIndex - selectedIndex);
+
+      if (await selectAndVerifyRepository(runId, repositories, target)) {
+        return true;
+      }
+    }
   }
 
   // The list.* commands are generic workbench commands rather than Git API.
@@ -162,16 +212,163 @@ async function selectTargetRepository(runId, repositories, target) {
   logRun(runId, 'listNavigation=focusFirst');
   await vscode.commands.executeCommand('list.focusFirst');
 
-  for (let index = 0; index < repositoryIndex; index += 1) {
-    await vscode.commands.executeCommand('list.focusDown');
+  await moveRepositoryListFocus(runId, repositoryIndex);
+
+  if (await selectAndVerifyRepository(runId, repositories, target)) {
+    return true;
   }
 
-  logRun(runId, `listNavigation=focusDown:${repositoryIndex}`);
+  if (await correctRepositorySelection(
+    runId,
+    repositories,
+    order.repositories,
+    target,
+    repositoryIndex
+  )) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Moves focus in the repositories list by a signed number of rows.
+ *
+ * @param {number} runId
+ * @param {number} offset
+ */
+async function moveRepositoryListFocus(runId, offset) {
+  const command = offset < 0 ? 'list.focusUp' : 'list.focusDown';
+  const steps = Math.abs(offset);
+
+  for (let index = 0; index < steps; index += 1) {
+    await vscode.commands.executeCommand(command);
+  }
+
+  await waitForRepositoryListFocusToSettle();
+  logRun(runId, `listNavigation=${command}:${steps}`);
+}
+
+/**
+ * Gives VS Code a short moment to process queued list focus changes.
+ */
+async function waitForRepositoryListFocusToSettle() {
+  // Repeated list.focusDown commands can resolve before the repositories list
+  // has applied the final focused row. Selecting immediately after a long move
+  // can therefore select the previous row in large workspaces.
+  await new Promise(resolve =>
+    setTimeout(resolve, repositorySelectionSettleTimeoutMs)
+  );
+}
+
+/**
+ * Selects the focused repository and verifies whether it is the expected target.
+ *
+ * @param {number} runId
+ * @param {GitRepository[]} repositories
+ * @param {GitRepository} target
+ * @returns {Promise<boolean>}
+ */
+async function selectAndVerifyRepository(runId, repositories, target) {
   logRun(runId, 'listNavigation=select');
   await vscode.commands.executeCommand('list.select');
   await waitForRepositorySelectionToSettle();
   logSelectedRepositories(runId, repositories, 'selectedRepositoriesAfterListSelect');
-  return true;
+  return target.ui.selected;
+}
+
+/**
+ * Corrects one failed list selection using the repository actually selected.
+ *
+ * @param {number} runId
+ * @param {GitRepository[]} repositories
+ * @param {GitRepository[]} repositoriesInViewOrder
+ * @param {GitRepository} target
+ * @param {number} targetIndex
+ * @returns {Promise<boolean>}
+ */
+async function correctRepositorySelection(
+  runId,
+  repositories,
+  repositoriesInViewOrder,
+  target,
+  targetIndex
+) {
+  const selectedRepository = selectedRepositoriesFrom(repositories)[0];
+  const selectedIndex = selectedRepository
+    ? repositoriesInViewOrder.findIndex(repository =>
+      sameRepository(repository, selectedRepository)
+    )
+    : -1;
+
+  logRun(
+    runId,
+    `selectionCorrection=selectedIndex:${selectedIndex}; targetIndex:${targetIndex}`
+  );
+
+  if (selectedIndex === targetIndex) {
+    return false;
+  }
+
+  const correctionOffset = selectedIndex === -1
+    ? targetIndex + 1
+    : targetIndex - selectedIndex;
+
+  // Keep the existing list focus. Re-focusing the repositories view can move
+  // focus to a different row than the repository VS Code just selected.
+  await moveRepositoryListFocus(runId, correctionOffset);
+  return selectAndVerifyRepository(runId, repositories, target);
+}
+
+/**
+ * Filters Git API repositories down to entries expected in the repositories view.
+ *
+ * @param {number} runId
+ * @param {GitRepository[]} repositories
+ * @param {GitRepository} target
+ * @returns {GitRepository[]}
+ */
+function repositoriesVisibleInScmView(runId, repositories, target) {
+  const visibleRepositories = repositories.filter(repository =>
+    sameRepository(repository, target) || !hasParentRepository(repository, repositories)
+  );
+  const hiddenRepositories = repositories.filter(repository =>
+    !visibleRepositories.includes(repository)
+  );
+
+  if (hiddenRepositories.length > 0) {
+    logRun(runId, `repositoriesHiddenAsNested=${repositoryNames(hiddenRepositories)}`);
+  }
+
+  return visibleRepositories;
+}
+
+/**
+ * Checks whether a repository root is nested under another discovered root.
+ *
+ * @param {GitRepository} repository
+ * @param {GitRepository[]} repositories
+ * @returns {boolean}
+ */
+function hasParentRepository(repository, repositories) {
+  return repositories.some(candidate =>
+    !sameRepository(candidate, repository) &&
+    isDescendantPath(repository.rootUri.fsPath, candidate.rootUri.fsPath)
+  );
+}
+
+/**
+ * Returns whether childPath is below parentPath.
+ *
+ * @param {string} childPath
+ * @param {string} parentPath
+ * @returns {boolean}
+ */
+function isDescendantPath(childPath, parentPath) {
+  const relativePath = path.relative(parentPath, childPath);
+  return relativePath !== '' &&
+    !relativePath.startsWith('..') &&
+    !path.isAbsolute(relativePath);
 }
 
 /**
@@ -227,27 +424,55 @@ function workspaceFolderNames() {
 }
 
 /**
- * Sorts repositories to match the Source Control repositories view.
+ * Returns plausible Source Control repository orders, preferred order first.
  *
  * @param {number} runId
  * @param {GitRepository[]} repositories
+ * @returns {RepositoryOrder[]}
+ */
+function repositoryOrdersForView(runId, repositories) {
+  // VS Code exposes the configured repository sort order, but the focused SCM
+  // view can lag behind or use a user-toggled order. Try the configured order
+  // first, then verify and fall back to the other supported orders.
+  /** @type {string} */
+  const sortOrder = vscode.workspace
+    .getConfiguration('scm')
+    .get('repositories.sortOrder', 'name');
+
+  logRun(runId, `repositorySortOrder=${sortOrder}`);
+
+  const labels = [sortOrder, 'discovery time', 'name', 'path'];
+  /** @type {RepositoryOrder[]} */
+  const orders = [];
+
+  for (const label of labels) {
+    const repositoriesForOrder = sortRepositoriesForOrder(repositories, label);
+    const key = repositoryNames(repositoriesForOrder);
+
+    if (!orders.some(order => repositoryNames(order.repositories) === key)) {
+      orders.push({
+        label,
+        repositories: repositoriesForOrder,
+      });
+    }
+  }
+
+  return orders;
+}
+
+/**
+ * Sorts repositories using one supported SCM repositories sort order.
+ *
+ * @param {GitRepository[]} repositories
+ * @param {string} sortOrder
  * @returns {GitRepository[]}
  */
-function sortRepositoriesForView(runId, repositories) {
-  // The Repositories view can be sorted by setting. Mirror that ordering before
-  // calculating how many list.focusDown commands are needed to reach the target.
-  /** @type {string} */
-  const sortKey = vscode.workspace
-    .getConfiguration('scm')
-    .get('repositories.sortKey', 'name');
-
-  logRun(runId, `repositorySortKey=${sortKey}`);
-
-  if (sortKey === 'path') {
+function sortRepositoriesForOrder(repositories, sortOrder) {
+  if (sortOrder === 'path') {
     return [...repositories].sort(compareRepositoriesByPath);
   }
 
-  if (sortKey === 'discoveryTime') {
+  if (sortOrder === 'discovery time') {
     return repositories;
   }
 
@@ -264,8 +489,18 @@ function sortRepositoriesForView(runId, repositories) {
 function logSelectedRepositories(runId, repositories, label) {
   // This log is diagnostic only; it lets issue reports show whether VS Code's
   // Git API observed the same selection the user saw in the Source Control view.
-  const selectedRepositories = repositories.filter(repository => repository.ui.selected);
+  const selectedRepositories = selectedRepositoriesFrom(repositories);
   logRun(runId, `${label}=${repositoryNames(selectedRepositories) || '<none>'}`);
+}
+
+/**
+ * Returns repositories currently selected according to the Git API.
+ *
+ * @param {GitRepository[]} repositories
+ * @returns {GitRepository[]}
+ */
+function selectedRepositoriesFrom(repositories) {
+  return repositories.filter(repository => repository.ui.selected);
 }
 
 /**
@@ -420,4 +655,8 @@ module.exports = {
  * @typedef {object} GitExtension
  * @property {boolean} enabled
  * @property {(version: 1) => GitAPI} getAPI
+ *
+ * @typedef {object} RepositoryOrder
+ * @property {string} label
+ * @property {GitRepository[]} repositories
  */
