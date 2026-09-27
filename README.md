@@ -35,4 +35,4 @@ The extension makes most sense if bound to a keyboard shortcut, e.g.:
 
 Reveal Repo uses VS Code's built-in Git extension API to find the repository for the active file, then opens and focuses the Source Control repositories view. Since VS Code's private `scm<N>` commands do not reliably map back to Git repositories, Reveal Repo navigates the visible repositories list directly and selects the repository that matches the active file.
 
-This functionality would ideally live directly in VS Code. A related feature request existed upstream but seems abandoned: <https://github.com/microsoft/vscode/issues/152653>.
+This is a somewhat fragile usability hack that might not work for all workspace and repo constellations. It would be far better to implement this functionality directly in VS Code. A related feature request existed upstream but seems abandoned: <https://github.com/microsoft/vscode/issues/152653>.
