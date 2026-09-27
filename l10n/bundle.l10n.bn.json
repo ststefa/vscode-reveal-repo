@@ -1,0 +1,8 @@
+{
+  "No active editor.": "কোনো সক্রিয় সম্পাদক নেই।",
+  "Built-in Git extension not found.": "বিল্ট-ইন Git এক্সটেনশন পাওয়া যায়নি।",
+  "Built-in Git extension is disabled.": "বিল্ট-ইন Git এক্সটেনশন নিষ্ক্রিয়।",
+  "No Git repository found for the active file.": "সক্রিয় ফাইলের জন্য কোনো Git রিপোজিটরি পাওয়া যায়নি।",
+  "Could not find the VS Code SCM command for repository {0}.": "রিপোজিটরি {0}-এর জন্য VS Code SCM কমান্ড পাওয়া যায়নি.",
+  "Selected Git repository: {0}": "নির্বাচিত Git রিপোজিটরি: {0}"
+}

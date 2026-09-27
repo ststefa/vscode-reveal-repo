@@ -1,0 +1,8 @@
+{
+  "No active editor.": "कोई सक्रिय संपादक नहीं है.",
+  "Built-in Git extension not found.": "अंतर्निहित Git एक्सटेंशन नहीं मिला.",
+  "Built-in Git extension is disabled.": "अंतर्निहित Git एक्सटेंशन अक्षम है.",
+  "No Git repository found for the active file.": "सक्रिय फ़ाइल के लिए कोई Git रिपॉज़िटरी नहीं मिली.",
+  "Could not find the VS Code SCM command for repository {0}.": "रिपॉज़िटरी {0} के लिए VS Code SCM कमांड नहीं मिला.",
+  "Selected Git repository: {0}": "चयनित Git रिपॉज़िटरी: {0}"
+}

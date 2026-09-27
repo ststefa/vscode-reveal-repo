@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Reveal Repo icon</title>
+  <desc id="desc">A Git-style branch symbol with a lightning bolt for quickly revealing the active repository.</desc>
+  <rect width="256" height="256" rx="44" fill="#24292f"/>
+  <path fill="#f05033" d="M139.3 30.7a16 16 0 0 0-22.6 0l-86 86a16 16 0 0 0 0 22.6l86 86a16 16 0 0 0 22.6 0l86-86a16 16 0 0 0 0-22.6l-86-86Z"/>
+  <path fill="#fff" d="M147 78a19 19 0 1 0-29 16.1v40.2a19 19 0 1 0 14 0v-27.9l29.6 29.6a19 19 0 1 0 9.9-9.9L141.9 96.5A18.9 18.9 0 0 0 147 78Zm-28 0a9 9 0 1 1 18 0 9 9 0 0 1-18 0Zm43 62a9 9 0 1 1 18 0 9 9 0 0 1-18 0Zm-43 12a9 9 0 1 1 18 0 9 9 0 0 1-18 0Z"/>
+  <path fill="#24292f" d="M161 66h45l-27 50h33l-68 78 20-59h-34l31-69Z"/>
+  <path fill="#ffd43b" d="M167.2 73h27.2l-27 50h31.7l-43.4 49.8 14.9-43.8h-30.9l27.5-56Z"/>
+</svg>

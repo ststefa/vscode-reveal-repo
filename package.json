@@ -1,0 +1,50 @@
+{
+    "name": "reveal-repo",
+    "displayName": "Reveal Repo",
+    "author": "Stefan Steinert <ststefa@heldenzeit.net>",
+    "publisher": "StefanSteinert",
+    "version": "0.1.0",
+    "description": "Reveal the Git repository for the active file in VS Code's Source Control view",
+    "icon": "images/icon.png",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "activationEvents": [
+        "onCommand:activeGitRepository.select"
+    ],
+    "l10n": "./l10n",
+    "main": "./extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "activeGitRepository.select",
+                "title": "%activeGitRepository.select.title%"
+            }
+        ]
+    },
+    "categories": [
+        "Other"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ststefa/reveal-repo.git"
+    },
+    "bugs": {
+        "url": "https://github.com/ststefa/reveal-repo/issues"
+    },
+    "homepage": "https://github.com/ststefa/reveal-repo#readme",
+    "license": "CC-BY-SA-4.0",
+    "devDependencies": {
+        "@vscode/vsce": "^3.6.0"
+    },
+    "scripts": {
+        "package": "vsce package",
+        "test": "node --test"
+    },
+    "keywords": [
+        "git",
+        "repository",
+        "scm",
+        "source control"
+    ]
+}

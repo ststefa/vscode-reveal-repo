@@ -1,0 +1,8 @@
+{
+  "No active editor.": "アクティブなエディターがありません。",
+  "Built-in Git extension not found.": "組み込みの Git 拡張機能が見つかりません。",
+  "Built-in Git extension is disabled.": "組み込みの Git 拡張機能が無効になっています。",
+  "No Git repository found for the active file.": "アクティブなファイルの Git リポジトリが見つかりません。",
+  "Could not find the VS Code SCM command for repository {0}.": "リポジトリ {0} の VS Code SCM コマンドが見つかりません。",
+  "Selected Git repository: {0}": "選択した Git リポジトリ: {0}"
+}

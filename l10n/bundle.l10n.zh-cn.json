@@ -1,0 +1,8 @@
+{
+  "No active editor.": "没有活动编辑器。",
+  "Built-in Git extension not found.": "未找到内置 Git 扩展。",
+  "Built-in Git extension is disabled.": "内置 Git 扩展已禁用。",
+  "No Git repository found for the active file.": "未找到活动文件对应的 Git 存储库。",
+  "Could not find the VS Code SCM command for repository {0}.": "找不到存储库 {0} 的 VS Code SCM 命令。",
+  "Selected Git repository: {0}": "已选择 Git 存储库：{0}"
+}

@@ -1,0 +1,11 @@
+# Things to keep out of the vsix package
+.DS_Store
+.github
+.gitignore
+*.code-workspace
+*.vsix
+images/*.svg
+images/icon-white.png
+node_modules
+package-lock.json
+test

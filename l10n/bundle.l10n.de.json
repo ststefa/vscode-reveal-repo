@@ -1,0 +1,8 @@
+{
+  "No active editor.": "Kein aktiver Editor.",
+  "Built-in Git extension not found.": "Integrierte Git-Erweiterung nicht gefunden.",
+  "Built-in Git extension is disabled.": "Integrierte Git-Erweiterung ist deaktiviert.",
+  "No Git repository found for the active file.": "Kein Git-Repository fuer die aktive Datei gefunden.",
+  "Could not find the VS Code SCM command for repository {0}.": "VS-Code-SCM-Befehl fuer Repository {0} nicht gefunden.",
+  "Selected Git repository: {0}": "Git-Repository ausgewaehlt: {0}"
+}
